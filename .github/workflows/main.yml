@@ -21,7 +21,7 @@ jobs:
           ZIP_FILE=$(find . -maxdepth 3 -type f -iname "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: No ZIP file found."
+            echo "ERROR: TEST MITRA ZIP not found"
             exit 1
           fi
 
@@ -33,25 +33,22 @@ jobs:
         run: |
           rm -rf extracted
           mkdir -p extracted
-
           unzip -q "$ZIP_FILE" -d extracted
-
-          echo "ZIP extracted successfully."
 
       - name: Find Android Project
         shell: bash
         run: |
-          PROJECT_DIR=$(find extracted -type f -name "gradlew" -printf '%h\n' | head -n 1)
+          PROJECT_DIR=$(find extracted -type f -name "settings.gradle.kts" -printf '%h\n' | head -n 1)
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: gradlew not found."
-            echo "Checking extracted files:"
-            find extracted -maxdepth 4 -type f | head -200
-            exit 1
+            PROJECT_DIR=$(find extracted -type f -name "settings.gradle" -printf '%h\n' | head -n 1)
           fi
 
-          echo "Android project found at:"
-          echo "$PROJECT_DIR"
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android project not found"
+            find extracted -maxdepth 4 -type f
+            exit 1
+          fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
@@ -64,24 +61,24 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Make Gradle Executable
-        shell: bash
-        run: |
-          chmod +x "$PROJECT_DIR/gradlew"
+      - name: Setup Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
 
       - name: Build TEST MITRA APK
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
-          ./gradlew :app:assembleDebug --stacktrace
+          gradle :app:assembleDebug --stacktrace
 
-      - name: Find APK
+      - name: Check APK
         shell: bash
         run: |
-          echo "APK files:"
-          find "$PROJECT_DIR/app/build/outputs/apk" -type f -name "*.apk" -print
+          find "$PROJECT_DIR/app/build/outputs/apk" \
+            -type f -name "*.apk" -print
 
-      - name: Upload TEST MITRA APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: TEST-MITRA-APK
